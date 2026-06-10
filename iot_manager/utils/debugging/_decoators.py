@@ -7,14 +7,17 @@ Defines the core game
 Author:
 Nilusink
 """
-from traceback import format_exc
-from icecream import ic
 import typing as tp
+from traceback import format_exc
+
+from icecream import ic
+
+from ._console_colors import CC, get_fg_color  # , terminal_link
+from ._utils import get_caller_name
+
 # import inspect
 
 
-from ._console_colors import CC, get_fg_color#, terminal_link
-from ._utils import get_caller_name
 
 
 def run_with_debug(

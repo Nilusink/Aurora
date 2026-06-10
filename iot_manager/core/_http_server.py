@@ -7,22 +7,25 @@ provides multiple endpoints making the manager available to the network
 Author:
 Nilusink
 """
-from fastapi import FastAPI, HTTPException
-from http import HTTPStatus
-from copy import copy
-import uvicorn
 
-from ._device_manager import DeviceManager
-from ._device_buffer import DeviceBuffer
+from copy import copy
+from http import HTTPStatus
+
+import uvicorn
+from fastapi import FastAPI, HTTPException
+from icecream import ic
+
 from ..utils.debugging import debugger
+from ._device_buffer import DeviceBuffer
+from ._device_manager import DeviceManager
 
 
 class HTTPServer:
     def __init__(
-            self,
-            device_buffer: DeviceBuffer,
-            device_manager: DeviceManager,
-            address: tuple[str, int] = ("0.0.0.0", 12345)
+        self,
+        device_buffer: DeviceBuffer,
+        device_manager: DeviceManager,
+        address: tuple[str, int] = ("0.0.0.0", 12345),
     ) -> None:
         self._dev_buf = device_buffer
         self._dev_man = device_manager
@@ -34,6 +37,12 @@ class HTTPServer:
         self._setup_routes()
 
     def _setup_routes(self) -> None:
+        # is alive
+        @self._app.get("/")
+        async def index() -> dict:
+            """is alive check"""
+            return {"hello": "world"}
+
         # device buffer
         @self._app.get("/device/{device_id}/data/{endpoint:path}")
         async def get_device_data(device_id: int, endpoint: str) -> dict:
@@ -43,8 +52,8 @@ class HTTPServer:
             :param device_id: device request id
             :param endpoint: normal device endpoint
             """
-            endpoint = '/' + endpoint.strip().rstrip("/")
-            debugger.trace(f"dev_buf: getting device {device_id}, \"{endpoint}\"")
+            endpoint = endpoint.strip().rstrip("/")
+            debugger.trace(f'dev_buf: getting device {device_id}, "{endpoint}"')
 
             data = self._dev_buf.get_device_data(device_id, endpoint)
 
@@ -68,25 +77,25 @@ class HTTPServer:
             try:
                 device = self._dev_man.get_device(device_id)
 
-            except ValueError:
+            except KeyError:
                 raise HTTPException(
                     status_code=HTTPStatus.NOT_FOUND,
                 )
 
-            return device.__dict__
+            return device.to_dict()
 
         @self._app.get("/device/{device_id}/address")
         async def get_address(device_id: int) -> dict:
             try:
                 address = self._dev_man.get_address(device_id)
 
-            except ValueError:
+            except KeyError:
                 raise HTTPException(
                     status_code=HTTPStatus.NOT_FOUND,
                 )
 
             return {
-                "ip": address[0],
+                "ip": str(address[0]),
                 "port": address[1],
             }
 
@@ -114,7 +123,7 @@ class HTTPServer:
                 )
 
             device = self._dev_man.get_device(did)
-            return device.__dict__
+            return device.to_dict()
 
     async def serve(self):
         """Run this buffer as its own FastAPI server."""
@@ -122,7 +131,7 @@ class HTTPServer:
             self._app,
             host=self._address[0],
             port=self._address[1],
-            log_level="warning"
+            log_level="warning",
             # log_level={
             #     # DebugLevel.error: "error",
             #     # DebugLevel.warning: "warning",

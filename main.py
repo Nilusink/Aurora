@@ -1,11 +1,13 @@
-from iot_manager.utils.debugging import debugger, DebugLevel
-from iot_manager.core import HTTPServer, DeviceBuffer, IOTDevice, DeviceManager
-from time import perf_counter
-from icecream import ic
 # from time import sleep
 import asyncio
 import signal
 import sys
+from time import perf_counter
+
+from icecream import ic
+
+from iot_manager.core import DeviceBuffer, DeviceManager, HTTPServer, IOTDevice
+from iot_manager.utils.debugging import DebugLevel, debugger
 
 SIGNALS: list[signal.Signals]
 if sys.platform == 'win32':
@@ -43,14 +45,14 @@ async def main() -> None:
     dev_buf = DeviceBuffer()
 
     # add device 0 and 1 to request buffer
-    dev_buf.add_device(dev_man.device_data[0], 2)
-    dev_buf.add_device(dev_man.device_data[1], 2)
+    dev_buf.add_device(dev_man.get_device(0), 2)
+    dev_buf.add_device(dev_man.get_device(1), 2)
 
     # http server
     server = HTTPServer(
         dev_buf,
         dev_man,
-        ("0.0.0.0", 12345)
+        ("127.0.0.1", 12345)
     )
 
     # cleanup

@@ -7,11 +7,11 @@ defines a few useful classes
 Author:
 Nilusink, melektron
 """
-from time import perf_counter
-import typing as tp
-import math as m
 import asyncio
 import inspect
+import math as m
+import typing as tp
+from time import perf_counter
 
 
 class BetterDict:

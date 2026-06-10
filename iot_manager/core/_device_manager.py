@@ -7,30 +7,28 @@ manages devices (surprise)
 Author:
 Nilusink
 """
-from copy import copy
+import ipaddress
 import typing as tp
-import sqlite3
+from copy import copy
+from ipaddress import IPv4Address
 
 from ._datatypes import IOTDevice
-
-
-# TODO: replace with proper database!
-DEVICE_DATA: dict[int, IOTDevice] = {
-    0: IOTDevice(0, ("192.168.68.10", 80), ("/weather", "/brightness")),
-    1: IOTDevice(1, ("192.168.68.11", 80), ("/weather",)),
-    2: IOTDevice(2, ("192.168.68.12", 80), ("/weather", "/brightness")),
-    3: IOTDevice(3, ("192.168.68.13", 80), ("/weather", "/brightness"))
-}
+from ._device_db import DeviceDB
 
 
 class DeviceManager:
-    def __init__(self) -> None:
-        self._device_data = DEVICE_DATA
+    """
+    Manages all IOT devices.
 
-    @property
-    def device_data(self) -> dict[int, IOTDevice]:
-        """get all devices"""
-        return self._device_data.copy()
+    :ivar _db: device database instance
+    """
+
+    # region InstanceVars
+    _db: DeviceDB
+    # endregion
+
+    def __init__(self):
+        self._db = DeviceDB()
 
     def get_device(self, device_id: int) -> IOTDevice:
         """
@@ -39,34 +37,28 @@ class DeviceManager:
         :param device_id: target device id
         :return: iot device
         """
-        if device_id not in self._device_data:
-            raise ValueError("Device id not found")
+        return self._db.get_device(device_id=device_id)
 
-        return self._device_data[device_id]
+    def get_devices(self) -> list[IOTDevice]:
+        return self._db.get_devices()
 
-    def get_address(self, device_id: int) -> tuple[str, int]:
+    def get_address(self, device_id: int) -> tuple[IPv4Address, int]:
         """
         get a devices ip address (and port)
 
         :param device_id: target device id
         :return: (ip, port)
         """
-        if device_id not in self._device_data:
-            raise ValueError("Device id not found")
+        return self._db.get_address(device_id)
 
-        return copy(self._device_data[device_id].address)
-
-    def get_endpoints(self, device_id: int) -> tp.Iterable[str]:
+    def get_endpoints(self, device_id: int) -> tp.Iterable[tuple[str, str]]:
         """
         get all available endpoints of a device
 
         :param device_id: the device id
-        :return: list of device ids
+        :return: list of device endpoints [(endpoint, type), ...]
         """
-        if device_id not in self._device_data:
-            raise ValueError("Device id not found")
-
-        return copy(self._device_data[device_id].endpoints)
+        return [(e[0], e[1].name) for e in self._db.get_endpoints(device_id)]
 
     def find_by_ip(self, device_ip: str) -> int:
         """
@@ -75,8 +67,8 @@ class DeviceManager:
         :param device_ip:
         :return: -1 if not found
         """
-        for device in self._device_data.values():
-            if device.address[0] == device_ip:
-                return device.id
+        try:
+            return self._db.get_device(device_ip=ipaddress.IPv4Address(device_ip)).id
 
-        return -1
+        except KeyError:
+            return -1

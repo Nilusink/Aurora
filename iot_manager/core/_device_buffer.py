@@ -9,20 +9,23 @@ host and to remove stress from small ics
 Author:
 Nilusink
 """
-from concurrent.futures import ThreadPoolExecutor, Future
-import typing as tp
-import requests
+
 import time
+import typing as tp
+from types import EllipsisType
+from concurrent.futures import Future, ThreadPoolExecutor
+
+import requests
 
 from ..utils.debugging import debugger  # , DebugLevel  # , run_with_debug
-from ._datatypes import IOTDevice
+from ._datatypes import IOTDevice, EndpointType
 
 
 class _DeviceParams(tp.TypedDict):
     device: IOTDevice
     interval: float
     last_update: float
-    last_data: dict[str, dict]
+    last_data: dict[str, dict | EllipsisType]
 
 
 class DeviceBuffer:
@@ -30,7 +33,7 @@ class DeviceBuffer:
     _current_client_id = 0
 
     def __init__(
-            self,
+        self,
     ) -> None:
         debugger.trace("dev_buf: initializing...")
 
@@ -55,11 +58,12 @@ class DeviceBuffer:
         while self.__running:
             now = time.time()
             for did, device in self._clients.items():
-
                 # check if device data needs to be updated
                 if (now - device["last_update"]) > device["interval"]:
                     self._update_device(did, True)
                     device["last_update"] = time.time()
+
+            time.sleep(0.1)
 
         debugger.trace("dev_buf: device requester stopped")
 
@@ -68,11 +72,7 @@ class DeviceBuffer:
     #     show_finish=True,
     #     reraise_errors=True,
     # )
-    def _update_device(
-            self,
-            device_id: int,
-            background: bool = True
-    ) -> None | Future:
+    def _update_device(self, device_id: int, background: bool = True) -> None | Future:
         """
         update a devices data
 
@@ -84,41 +84,46 @@ class DeviceBuffer:
 
         # request data from given address
         device = self._clients[device_id]
+        dev: IOTDevice = device["device"]
         debugger.trace(
-            f"dev_buf: updating device {device_id} at "
-            f"{device['device'].address}"
+            f"dev_buf: updating device {device_id} at {device['device'].address}"
         )
 
-        for endpoint in device["device"].endpoints:
+        for endpoint, endpoint_type in dev.endpoints:
+            # only request GET endpoints
+            if endpoint_type != EndpointType.GET:
+                continue
+            
             debugger.trace(
                 f"dev_buf: requesting http://{device['device'].address[0]}:"
-                f"{device['device'].address[1]}{endpoint}"
+                f"{device['device'].address[1]}/{endpoint}"
             )
             # request single endpoint and save to buffer
             try:
                 data = requests.get(
                     f"http://{device['device'].address[0]}:"
-                    f"{device['device'].address[1]}{endpoint}",
-                    timeout=min(device["interval"] / 2, 5)
+                    f"{device['device'].address[1]}/{endpoint}",
+                    timeout=min(device["interval"] / 2, 5),
                 ).json()
 
             except (
-                    TimeoutError,
-                    requests.ReadTimeout,
-                    requests.ConnectTimeout,
-                    requests.ConnectionError
+                TimeoutError,
+                requests.ReadTimeout,
+                requests.ConnectTimeout,
+                requests.ConnectionError,
             ):
                 debugger.log(
-                    f"dev_buf: failed to get data form "
-                    f"{device['device'].address}"
+                    f"dev_buf: failed to get data form {device['device'].address}"
                 )
                 continue
 
             device["last_data"][endpoint] = data
 
             debugger.trace(
-                f"dev_buf: updated device {device_id} at \"{endpoint}\": {data}"
+                f'dev_buf: updated device {device_id} at "{endpoint}": {data}'
             )
+
+        return None
 
     def add_device(self, device: IOTDevice, interval_s: float) -> int:
         """
@@ -127,7 +132,7 @@ class DeviceBuffer:
         :param device: IOT device to add
         :param interval_s: interval in seconds between device requests
         :returns: client id
-       """
+        """
         cid = device.id
 
         debugger.log(f"dev_buf: adding device {cid} at {device.address}")
@@ -136,7 +141,7 @@ class DeviceBuffer:
             "device": device,
             "interval": interval_s,
             "last_update": 0,
-            "last_data": {ep: ... for ep in device.endpoints},
+            "last_data": {ep[0]: ... for ep in device.endpoints},
         }
 
         return cid

@@ -9,8 +9,8 @@ Nilusink
 """
 from enum import IntEnum
 from os import PathLike
-from icecream import ic
 
+from icecream import ic
 
 from ._console_colors import CC, get_fg_color
 from ._utils import print_ic_style

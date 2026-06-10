@@ -7,10 +7,11 @@ generally useful functions
 Author:
 Nilusink
 """
-from icecream import ic
 import inspect
 
-from ._console_colors import get_fg_color, CC
+from icecream import ic
+
+from ._console_colors import CC, get_fg_color
 
 
 def get_caller_name() -> str:
